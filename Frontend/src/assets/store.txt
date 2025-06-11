@@ -1,0 +1,168 @@
+import { useState, useRef } from 'react';
+import './App.css';
+
+function App() {
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [error, setError] = useState(null);
+  const [response, setResponse] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Handle drag events
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile && droppedFile.type.startsWith('image/')) {
+      setFile(droppedFile);
+      setPreviewUrl(URL.createObjectURL(droppedFile));
+      setError(null);
+      setShowPreview(false);
+    } else {
+      setError('Please drop a valid image file');
+      setFile(null);
+      setPreviewUrl(null);
+      setShowPreview(false);
+    }
+  };
+
+  // Handle file input change
+  const handleSelectPics = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile && selectedFile.type.startsWith('image/')) {
+      setFile(selectedFile);
+      setPreviewUrl(URL.createObjectURL(selectedFile));
+      setError(null);
+      setShowPreview(false);
+    } else {
+      setError('Please select a valid image file');
+      setFile(null);
+      setPreviewUrl(null);
+      setShowPreview(false);
+    }
+  };
+
+  // Trigger file input click
+  const handleSelectClick = () => {
+    fileInputRef.current.click();
+  };
+
+  // Handle preview button click
+  const handlePreviewClick = () => {
+    if (file) {
+      setShowPreview(true);
+      setError(null);
+    } else {
+      setError('No image selected to preview');
+    }
+  };
+
+  // Handle send button click
+  const handleSendClick = async () => {
+    if (!file) {
+      setError('Please select or drop an image');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const res = await fetch('http://localhost:4500/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      console.log('Server response:', data); // Debug log
+      if (res.ok) {
+        setResponse(data);
+        setError(null);
+        const imgUrl = `http://localhost:4500${data.processedImage}`;
+        // console.log('Attempting to load image:', imgUrl); // Debug log
+        console.log(data);
+      } else {
+        setError(data.error || 'Failed to upload image');
+        setResponse(null);
+      }
+    } catch (err) {
+      console.error('Fetch error:', err.message);
+      setError('Error uploading image: ' + err.message);
+      setResponse(null);
+    }
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    setError('Failed to load processed image. Check if the image exists at http://localhost:4500/Uploads.');
+  };
+
+  return (
+    <div className="container">
+      <h1>Image Upload</h1>
+      <div
+        className={`drop-zone ${dragActive ? 'active' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <p>Drag and drop an image here</p>
+      </div>
+      <div className="button-group">
+        <button type="button" onClick={handleSelectClick} className="select-button">
+          Select Pics
+        </button>
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileInputRef}
+          onChange={handleSelectPics}
+          style={{ display: 'none' }}
+        />
+        <button type="button" onClick={handlePreviewClick} className="preview-button">
+          Preview
+        </button>
+        <button type="button" onClick={handleSendClick} className="send-button">
+          Send
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {showPreview && file && (
+        <div className="preview-section">
+          <h2>Preview</h2>
+          <img src={previewUrl} alt="Preview" className="preview-image" />
+          <p>Selected: {file.name}</p>
+        </div>
+      )}
+      {response && (
+        <div className="response-section">
+          <h2>Processed Image</h2>
+          <p>{response.message}</p>
+          <img
+            src={`http://localhost:4500${response.processedImage}`}
+            alt="Processed"
+            className="processed-image"
+            onError={handleImageError}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
